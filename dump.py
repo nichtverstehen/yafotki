@@ -16,7 +16,7 @@ def save_album_meta(album, dest):
 	summary = fotki.atom(album, '{http://www.w3.org/2005/Atom}summary')
 	filepath = os.path.join(dest, title)
 
-	print '\nSaving album %s (%s) -> %s' % (title, summary, filepath)
+	print ('\nSaving album %s (%s) -> %s' % (title, summary, filepath)).encode('utf-8')
 	if not os.path.isdir(filepath): os.mkdir(filepath)
 	indexpath = os.path.join(filepath, INDEXFILE)
 	if summary is not None:
@@ -52,7 +52,7 @@ def save_photos(auth, album, dest):
 		filename = unique_title + '.jpg' if not unique_title.lower().endswith('.jpg') else unique_title
 		filepath = os.path.join(dest, filename)
 
-		print 'Saving "%s" (%s - %s - %s): ' % (unique_title, created, ', '.join(tags), summary),
+		print ('Saving "%s" (%s - %s - %s): ' % (unique_title, created, ', '.join(tags), summary)).encode('utf-8'),
 		if summary is not None or tags:
 			with open(os.path.join(dest, INDEXFILE), 'a') as index_file:
 				d = "%s (%s)" % (unique_title, ', '.join(tags)) + (': %s' % summary if summary is not None else '')
