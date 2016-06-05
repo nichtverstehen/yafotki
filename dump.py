@@ -1,4 +1,4 @@
-import sys, os, urllib2, time, calendar, contextlib
+import sys, os, urllib2, time, calendar, contextlib, itertools
 import fotki
 
 INDEXFILE = 'index.txt'
@@ -16,7 +16,7 @@ def save_album_meta(album, dest):
 	summary = fotki.atom(album, '{http://www.w3.org/2005/Atom}summary')
 	filepath = os.path.join(dest, title)
 
-	print '\n\nSaving album %s (%s) -> %s' % (title, summary, filepath)
+	print '\nSaving album %s (%s) -> %s' % (title, summary, filepath)
 	if not os.path.isdir(filepath): os.mkdir(filepath)
 	indexpath = os.path.join(filepath, INDEXFILE)
 	if summary is not None:
@@ -29,10 +29,12 @@ def save_album_meta(album, dest):
 def save_photos(auth, album, dest):
 	photos_url = album.find('{http://www.w3.org/2005/Atom}link[@rel="photos"]').get('href')
 	photos_coll = fotki.all(auth, photos_url)
+	saved = set()
 	for photo in photos_coll.findall('{http://www.w3.org/2005/Atom}entry'):
 		title = fotki.atom(photo, '{http://www.w3.org/2005/Atom}title')
 		if title is None: title = photo.find('{http://www.w3.org/2005/Atom}id').text
-		fullsize = photo.find('{yandex:fotki}img[@size="orig"]').get('href')
+		original = photo.find('{yandex:fotki}img[@size="orig"]').get('href')
+		originalsize = fotki.atom(photo, '{yandex:fotki}img', size='orig', attr='bytesize')
 		created = fotki.atom(photo, '{yandex:fotki}created')
 		if created is None:
 			created = photo.find('{http://www.w3.org/2005/Atom}published').text
@@ -41,23 +43,38 @@ def save_photos(auth, album, dest):
 			'[@scheme="http://api-fotki.yandex.ru/api/users/nicht-verstehen/tags/"]')]
 		timestamp = calendar.timegm(time.strptime(created, "%Y-%m-%dT%H:%M:%SZ"))
 
-		filename = title + '.jpg' if not title.lower().endswith('.jpg') else title
+		for i in itertools.count():
+			name, ext = os.path.splitext(title)
+			unique_title =  name + (' (%d)' % i if i != 0 else '') + ext
+			if unique_title not in saved: break
+		saved.add(unique_title)
+
+		filename = unique_title + '.jpg' if not unique_title.lower().endswith('.jpg') else unique_title
 		filepath = os.path.join(dest, filename)
 
-		print 'Saving "%s" (%s - %s): %s\n%s -> %s' % (title, created, ', '.join(tags), summary, fullsize, filepath)
+		print 'Saving "%s" (%s - %s - %s): ' % (unique_title, created, ', '.join(tags), summary),
 		if summary is not None or tags:
 			with open(os.path.join(dest, INDEXFILE), 'a') as index_file:
-				d = "%s (%s)" % (title, ', '.join(tags)) + (': %s' % summary if summary is not None else '')
+				d = "%s (%s)" % (unique_title, ', '.join(tags)) + (': %s' % summary if summary is not None else '')
 				index_file.write('\n' + d.encode('utf-8') + '\n')
 
 		if os.path.isfile(filepath):
-			print "Skipping as it exists"
+			if originalsize is not None and os.path.getsize(filepath) != int(originalsize):
+				print "Already exists but OMG it is different"
+			else:
+				print "Already exists"
 		else:
-			with contextlib.closing(urllib2.urlopen(fullsize)) as jpgurl:
-				jpg = jpgurl.read()
-			with open(filepath, 'w') as f:
-				f.write(jpg)
-		os.utime(filepath, (timestamp, timestamp))
+			jpg = None
+			try:
+				with contextlib.closing(urllib2.urlopen(original)) as jpgurl:
+					jpg = jpgurl.read()
+			except urllib2.URLError as e:
+				print "Error downloading: %s" % e.reason
+			if jpg is not None:
+				with open(filepath, 'w') as f:
+					f.write(jpg)
+				os.utime(filepath, (timestamp, timestamp))
+				print "Done"
 
 def prepare_albums(albums_coll):
 	albums = {}

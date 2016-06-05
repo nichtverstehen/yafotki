@@ -4,6 +4,7 @@ Yandex.Fotki dumper downloads all photos from Yandex.Fotki (fotki.yandex.ru).
 * Replicates the album struture as directory structure.
 * Sets modification time to creation time according to Yandex.
 * Saves album and photo description along with the tags to `index.txt` files.
+* Handles photos with duplicate names gracefully (keeping all copies).
 * Single-threaded (i.e. takes a long time to download everything).
 
 ## Usage
